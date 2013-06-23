@@ -187,15 +187,16 @@ public class FirstPersonRenderer implements RenderSystem {
 
     private void renderBlock(BlockFamily blockFamily, float bobOffset, float handMovementAnimationOffset) {
         Block activeBlock = blockFamily.getArchetypeBlock();
-        Vector3f playerPos = localPlayer.getPosition();
+        //Vector3f playerPos = localPlayer.getPosition();
 
         // Adjust the brightness of the block according to the current position of the player
         ShaderProgram shader = ShaderManager.getInstance().getShaderProgram("block");
         shader.enable();
 
         // Apply biome and overall color offset
-        Vector4f color = activeBlock.calcColorOffsetFor(BlockPart.CENTER, worldProvider.getBiomeProvider().getTemperatureAt(TeraMath.floorToInt(playerPos.x), TeraMath.floorToInt(playerPos.z)), worldProvider.getBiomeProvider().getHumidityAt(TeraMath.floorToInt(playerPos.x), TeraMath.floorToInt(playerPos.z)));
-        shader.setFloat3("colorOffset", color.x, color.y, color.z);
+        // TODO: Make me look nice not ugly!
+        //Vector4f color = activeBlock.calcColorOffsetFor(BlockPart.CENTER, worldProvider.getBiomeProvider().getTemperatureAt(TeraMath.floorToInt(playerPos.x), TeraMath.floorToInt(playerPos.z)), worldProvider.getBiomeProvider().getHumidityAt(TeraMath.floorToInt(playerPos.x), TeraMath.floorToInt(playerPos.z)));
+        //shader.setFloat3("colorOffset", color.x, color.y, color.z);
 
         glEnable(GL11.GL_BLEND);
 
@@ -213,7 +214,14 @@ public class FirstPersonRenderer implements RenderSystem {
         glTranslatef(0f, 0.1f, 0f);
         glScalef(0.75f, 0.75f, 0.75f);
 
-        activeBlock.renderWithLightValue(worldRenderer.getRenderingLightValue());
+        float lightValue = worldRenderer.getRenderingLightValue();
+
+        //  Blocks with a luminance > 0.0 shouldn't be affected by block light
+        if (blockFamily.getArchetypeBlock().getLuminance() > 0.0) {
+            lightValue = 1.0f;
+        }
+
+        activeBlock.renderWithLightValue(lightValue);
 
         glPopMatrix();
 

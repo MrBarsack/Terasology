@@ -23,6 +23,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import org.lwjgl.opengl.ARBShaderObjects;
@@ -54,8 +55,6 @@ import javax.vecmath.Vector4f;
 public class ShaderProgram {
     private static final Logger logger = LoggerFactory.getLogger(ShaderProgram.class);
 
-    private static final String PreProcessorPreamble = "#version 120\n float TEXTURE_OFFSET = " + Block.TEXTURE_OFFSET + ";\n";
-
     private TIntIntMap fragmentPrograms = new TIntIntHashMap();
     private TIntIntMap vertexPrograms = new TIntIntHashMap();
     private TIntIntMap shaderPrograms = new TIntIntHashMap();
@@ -71,7 +70,10 @@ public class ShaderProgram {
     public enum ShaderProgramFeatures {
         FEATURE_TRANSPARENT_PASS(0x01),
         FEATURE_ALPHA_REJECT(0x02),
-        FEATURE_ALL(0x04);
+        FEATURE_LIGHT_POINT(0x04),
+        FEATURE_LIGHT_DIRECTIONAL(0x08),
+        FEATURE_DEFERRED_LIGHTING(0x10),
+        FEATURE_ALL(0x20);
 
         private int value;
         private ShaderProgramFeatures(int value) {
@@ -118,10 +120,16 @@ public class ShaderProgram {
         int counter = 1;
         compileShaderProgram(0);
 
+        TIntArrayList compiledPermutations = new TIntArrayList();
+
         for (int i=1; i<ShaderProgramFeatures.FEATURE_ALL.getValue(); ++i) {
             // Compile all selected features for this shader...
-            if ((i & availableFeatures) > 0) {
+
+            int maskedHash = (i & availableFeatures);
+            if (maskedHash > 0 && !compiledPermutations.contains(maskedHash)) {
                 compileShaderProgram(i);
+                compiledPermutations.add(maskedHash);
+
                 counter++;
             }
         }
@@ -371,8 +379,14 @@ public class ShaderProgram {
     }
 
     public static StringBuilder createShaderBuilder() {
+        String preProcessorPreamble = "#version 120\n";
+
+        preProcessorPreamble += "float TEXTURE_OFFSET = " + Block.calcRelativeTileSize() + ";\n";
+        // TODO: This shouldn't be hardcoded
+        preProcessorPreamble += "float TEXTURE_OFFSET_EFFECTS = " + 0.0625f + ";\n";
+
         Config config = CoreRegistry.get(Config.class);
-        StringBuilder builder = new StringBuilder().append(PreProcessorPreamble);
+        StringBuilder builder = new StringBuilder().append(preProcessorPreamble);
         if (config.getRendering().isAnimateGrass())
             builder.append("#define ANIMATED_GRASS \n");
         if (config.getRendering().isAnimateWater()) {

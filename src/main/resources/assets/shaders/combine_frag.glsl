@@ -17,9 +17,16 @@
 uniform sampler2D texSceneOpaque;
 uniform sampler2D texSceneOpaqueDepth;
 uniform sampler2D texSceneOpaqueNormals;
+uniform sampler2D texSceneOpaqueLightBuffer;
 uniform sampler2D texSceneTransparent;
-uniform sampler2D texSceneTransparentDepth;
-uniform sampler2D texSceneTransparentNormals;
+
+uniform vec4 skyInscatteringSettingsFrag;
+#define skyInscatteringStrength skyInscatteringSettingsFrag.y
+#define skyInscatteringLength skyInscatteringSettingsFrag.z
+#define skyInscatteringThreshold skyInscatteringSettingsFrag.w
+
+uniform sampler2D texSceneSkyBand;
+
 #ifdef SSAO
 uniform sampler2D texSsao;
 #endif
@@ -30,58 +37,44 @@ uniform float outlineDepthThreshold;
 uniform float outlineThickness;
 #endif
 
-uniform float shoreStart;
-uniform float shoreEnd;
-
 #define OUTLINE_COLOR 0.0, 0.0, 0.0
 
 void main() {
     vec4 colorOpaque = texture2D(texSceneOpaque, gl_TexCoord[0].xy);
-    float depthOpaque = texture2D(texSceneOpaqueDepth, gl_TexCoord[0].xy).r;
+    float depthOpaque = texture2D(texSceneOpaqueDepth, gl_TexCoord[0].xy).r * 2.0 - 1.0;
     vec4 normalsOpaque = texture2D(texSceneOpaqueNormals, gl_TexCoord[0].xy);
     vec4 colorTransparent = texture2D(texSceneTransparent, gl_TexCoord[0].xy);
-    float depthTransparent = texture2D(texSceneTransparentDepth, gl_TexCoord[0].xy).r;
-    vec4 normalsTransparent = texture2D(texSceneTransparentNormals, gl_TexCoord[0].xy);
+    vec4 lightBufferOpaque = texture2D(texSceneOpaqueLightBuffer, gl_TexCoord[0].xy);
+
+    // TODO: Move SSAO and outline stuff to LightBufferPass so it is available for refraction
+
+    // Sky inscattering using down-sampled sky band texture
+    vec3 skyInscatteringColor = texture2D(texSceneSkyBand, gl_TexCoord[0].xy).rgb;
+
+    float d = abs(linDepthVDist(depthOpaque));
+    float fogValue = clamp(((skyInscatteringLength - d) / (skyInscatteringLength - skyInscatteringThreshold)) * skyInscatteringStrength, 0.0, 1.0);
+
+    // No scattering in the sky please - otherwise we end up with an ugly blurred sky
+    if (depthOpaque < 1.0) {
+        colorOpaque = mix(colorOpaque, vec4(skyInscatteringColor, 1.0), fogValue);
+        colorTransparent = mix(colorTransparent, vec4(skyInscatteringColor, 1.0), fogValue);
+    }
 
 #ifdef SSAO
     float ssao = texture2D(texSsao, gl_TexCoord[0].xy).x;
-    colorOpaque *= vec4(ssao, ssao, ssao, 1.0);
+    colorOpaque.rgb *= mix(vec3(ssao), vec3(1.0, 1.0, 1.0), fogValue);
 #endif
 
 #ifdef OUTLINE
-    float outline = step(outlineDepthThreshold, texture2D(texEdges, gl_TexCoord[0].xy).x) * outlineThickness;
+    float outline = step(outlineDepthThreshold, texture2D(texEdges, gl_TexCoord[0].xy).x) * outlineThickness * (1.0 - fogValue);
     colorOpaque.rgb = (1.0 - outline) * colorOpaque.rgb + outline * vec3(OUTLINE_COLOR);
 #endif
 
-    vec4 color = vec4(0.0);
-    float depth = depthOpaque;
-    vec4 normals = vec4(0.0);
-
-    // Combine transparent and opaque RTs
-    if (depthTransparent < depthOpaque) {
-        depth = depthTransparent;
-
-        // TODO: Fix alpha blending...
-        //float fade = 1.0 - colorTransparent.a;
-        float fade = 0.0;
-        // Detect water in the transparent RT...
-        if (normalsTransparent.a > 0.99) {
-            // ... and fade out at the shore
-            float linDepthOpaque = linDepth(depthOpaque);
-            float linDepthTransparent = linDepth(depthTransparent);
-
-            float depthDiff = linDepthOpaque - linDepthTransparent;
-            fade = clamp((shoreEnd - depthDiff) / (shoreEnd - shoreStart), 0.0, 1.0);
-        }
-
-        normals = mix(normalsTransparent, normalsOpaque, fade);
-        color = mix(colorTransparent, colorOpaque, fade);
-    } else {
-        normals = normalsOpaque;
-        color = colorOpaque;
-    }
+    float fade = clamp(1.0 - colorTransparent.a, 0.0, 1.0);
+    vec4 color = mix(colorTransparent, colorOpaque, fade);
 
     gl_FragData[0].rgba = color.rgba;
-    gl_FragData[1].rgba = normals.rgba;
-    gl_FragDepth = depth;
+    gl_FragData[1].rgba = normalsOpaque.rgba;
+    gl_FragData[2].rgba = lightBufferOpaque.rgba;
+    gl_FragDepth = depthOpaque;
 }

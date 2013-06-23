@@ -16,25 +16,29 @@
 
 uniform sampler2D texScene;
 uniform sampler2D texDepth;
+
 #ifdef BLOOM
 uniform sampler2D texBloom;
 #endif
+
 #if !defined (NO_BLUR)
 uniform sampler2D texBlur;
 uniform float blurFocusDistance;
 uniform float blurStart;
 uniform float blurLength;
 #endif
+
 #ifdef VIGNETTE
 uniform sampler2D texVignette;
-#endif
-#ifdef FILM_GRAIN
-uniform sampler2D texNoise;
-uniform vec2 noiseSize = vec2(64.0, 64.0);
-uniform vec2 renderTargetSize = vec2(1280.0, 720.0);
+uniform vec3 inLiquidTint;
 #endif
 
 #ifdef FILM_GRAIN
+uniform sampler2D texNoise;
+
+uniform vec2 noiseSize;
+uniform vec2 renderTargetSize;
+
 uniform float noiseOffset;
 uniform float grainIntensity;
 #endif
@@ -49,7 +53,7 @@ void main() {
     vec4 colorBlur = texture2D(texBlur, gl_TexCoord[0].xy);
 #endif
 
-    float currentDepth = texture2D(texDepth, gl_TexCoord[0].xy).x;
+    float currentDepth = texture2D(texDepth, gl_TexCoord[0].xy).x * 2.0 - 1.0;
 
 #ifndef NO_BLUR
     float depthLin = linDepthVDist(currentDepth);
@@ -113,7 +117,7 @@ void main() {
 
 #ifdef FILM_GRAIN
     vec3 noise = texture2D(texNoise, renderTargetSize * (gl_TexCoord[0].xy + noiseOffset) / noiseSize).xyz * 2.0 - 1.0;
-    finalColor.rgb += vec3(noise) * grainIntensity;
+    finalColor.rgb += clamp(noise.xxx * grainIntensity, 0.0f, 1.0f);
 #endif
 
 #ifdef VIGNETTE
@@ -123,7 +127,7 @@ void main() {
         finalColor.rgb *= vig;
     } else {
         finalColor.rgb *= vig * vig * vig;
-        finalColor.rgb *= vec3(0.1, 0.2, 0.2);
+        finalColor.rgb *= inLiquidTint;
     }
 #endif
 
