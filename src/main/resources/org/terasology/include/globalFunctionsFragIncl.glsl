@@ -29,7 +29,6 @@
 #define W 11.2
 
 uniform bool swimming;
-uniform float carryingTorch;
 uniform float viewingDistance;
 uniform float daylight;
 uniform float tick;
@@ -55,16 +54,12 @@ float tonemapReinhard(float brightMax, float exposure) {
 }
 
 float calcLambLight(vec3 normal, vec3 lightVec) {
-    return dot(normal,lightVec);
+    return dot(normal, lightVec);
 }
 
 float calcSpecLight(vec3 normal, vec3 lightVec, vec3 eyeVec, float exp) {
     vec3 halfWay = normalize(eyeVec+lightVec);
     return pow(clamp(dot(halfWay, normal), 0.0, 1.0), exp);
-}
-
-float calcTorchlight(float light, vec3 lightPos) {
-    return light * clamp(1.0 - (length(lightPos) / 8.0), 0.0, 1.0);
 }
 
 vec4 linearToSrgb(vec4 color) {
@@ -75,9 +70,14 @@ vec4 srgbToLinear(vec4 color) {
     return vec4(color.rgb * color.rgb, color.a);
 }
 
+float expBlockLightValue(float light) {
+	float lightScaled = (1.0 - light) * 16.0;
+	return pow(0.96, lightScaled) * light;
+}
+
 float expLightValue(float light) {
 	float lightScaled = (1.0 - light) * 16.0;
-	return pow(0.76, lightScaled);
+	return pow(0.8, lightScaled) * light;
 }
 
 float expOccValue(float light) {
@@ -90,7 +90,7 @@ float timeToTick(float time, float speed) {
 
 float fresnel(float nDotL, float fresnelBias, float fresnelPow) {
   float facing = (1.0 - nDotL);
-  return max(fresnelBias + (1.0 - fresnelBias) * pow(facing, fresnelPow), 0.0);
+  return clamp(fresnelBias + (1.0 - fresnelBias) * pow(facing, fresnelPow), 0.0, 1.0);
 }
 
 bool checkFlag(int flag, float val) {
@@ -117,4 +117,15 @@ vec3 convertColorYxy(vec3 color, float colorExp) {
     const vec3 bCoeffs = vec3 (0.055684, -0.204043, 1.057311);
 
     return vec3 (dot(rCoeffs, XYZ), dot(gCoeffs, XYZ), dot(bCoeffs, XYZ));
+}
+
+vec2 projectVertexToTexCoord(vec4 projVertexPos) {
+    return 0.5 * (projVertexPos.xy/projVertexPos.w) + vec2(0.5);
+}
+
+vec3 reconstructViewPos(float depth, vec2 texCoord, mat4 paramInvProjMatrix) {
+    vec4 screenSpaceNorm = vec4(texCoord.x, texCoord.y, depth, 1.0);
+    vec4 screenSpacePos = screenSpaceNorm * vec4(2.0, 2.0, 1.0, 1.0) - vec4(1.0, 1.0, 0.0, 0.0);
+    vec4 viewSpacePos = paramInvProjMatrix * screenSpacePos;
+    return viewSpacePos.xyz / viewSpacePos.w;
 }

@@ -21,7 +21,7 @@ import org.terasology.asset.Assets;
 import org.terasology.config.Config;
 import org.terasology.editor.properties.Property;
 import org.terasology.game.CoreRegistry;
-import org.terasology.logic.manager.DefaultRenderingProcess;
+import org.terasology.rendering.renderingProcesses.DefaultRenderingProcess;
 import org.terasology.rendering.assets.Texture;
 import org.terasology.rendering.cameras.Camera;
 import org.terasology.rendering.world.WorldRenderer;
@@ -40,15 +40,6 @@ import static org.lwjgl.opengl.GL11.glBindTexture;
  * @author Benjamin Glatzel <benjamin.glatzel@me.com>
  */
 public class ShaderParametersChunk extends ShaderParametersBase {
-    private Texture water = Assets.getTexture("engine:custom_water_still");
-    private Texture lava = Assets.getTexture("engine:custom_lava_still");
-    private Texture waterNormal = Assets.getTexture("engine:water_normal");
-    private Texture effects = Assets.getTexture("engine:effects");
-
-    Property skyInscatteringLength = new Property("skyInscatteringLength", 1.0f, 0.0f, 1.0f);
-    Property skyInscatteringStrength = new Property("skyInscatteringStrength", 0.075f, 0.0f, 1.0f);
-    Property skyInscatteringThreshold = new Property("skyInscatteringThreshold", 0.60f, 0.0f, 1.0f);
-
     Property waveIntens = new Property("waveIntens", 1.0f, 0.0f, 2.0f);
     Property waveIntensFalloff = new Property("waveIntensFalloff", 0.88f, 0.0f, 2.0f);
     Property waveSize = new Property("waveSize", 0.24f, 0.0f, 2.0f);
@@ -66,9 +57,7 @@ public class ShaderParametersChunk extends ShaderParametersBase {
 
     Property waterOffsetY = new Property("waterOffsetY", 0.0f, 0.0f, 5.0f);
 
-    Property torchWaterSpecExp = new Property("torchWaterSpecExp", 30.0f, 0.0f, 64.0f);
     Property waterSpecExp = new Property("waterSpecExp", 512.0f, 0.0f, 1024.0f);
-    Property torchSpecExp = new Property("torchSpecExp", 32.0f, 0.0f, 64.0f);
 
     Property shadowIntens = new Property("shadowIntens", 0.5f, 0.0f, 1.0f);
     Property shadowMapBias = new Property("shadowMapBias", 0.01f, 0.0f, 0.1f);
@@ -77,7 +66,12 @@ public class ShaderParametersChunk extends ShaderParametersBase {
         super.applyParameters(program);
 
         Texture terrain = Assets.getTexture("engine:terrain");
-        if (terrain == null) {
+        Texture water = Assets.getTexture("engine:custom_water_still");
+        Texture lava = Assets.getTexture("engine:custom_lava_still");
+        Texture waterNormal = Assets.getTexture("engine:water_normal");
+        Texture effects = Assets.getTexture("engine:effects");
+
+        if (terrain == null || water == null || lava == null || waterNormal == null || effects == null) {
             return;
         }
 
@@ -98,15 +92,15 @@ public class ShaderParametersChunk extends ShaderParametersBase {
         glBindTexture(GL11.GL_TEXTURE_2D, effects.getId());
         program.setInt("textureEffects", texId++);
         GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
-        DefaultRenderingProcess.getInstance().getFBO("sceneReflected").bindTexture();
+        DefaultRenderingProcess.getInstance().bindFboTexture("sceneReflected");
         program.setInt("textureWaterReflection", texId++);
         GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
-        DefaultRenderingProcess.getInstance().getFBO("sceneOpaque").bindTexture();
+        DefaultRenderingProcess.getInstance().bindFboTexture("sceneOpaque");
         program.setInt("texSceneOpaque", texId++);
 
         if (CoreRegistry.get(Config.class).getRendering().isDynamicShadows()) {
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
-            DefaultRenderingProcess.getInstance().getFBO("sceneShadowMap").bindDepthTexture();
+            DefaultRenderingProcess.getInstance().bindFboDepthTexture("sceneShadowMap");
             program.setInt("texSceneShadowMap", texId++);
 
             Camera lightCamera = CoreRegistry.get(WorldRenderer.class).getLightCamera();
@@ -122,27 +116,8 @@ public class ShaderParametersChunk extends ShaderParametersBase {
         }
 
         Vector4f lightingSettingsFrag = new Vector4f();
-        lightingSettingsFrag.x = (Float) torchSpecExp.getValue();
-        lightingSettingsFrag.y = (Float) torchWaterSpecExp.getValue();
         lightingSettingsFrag.z = (Float) waterSpecExp.getValue();
         program.setFloat4("lightingSettingsFrag", lightingSettingsFrag);
-
-        WorldRenderer worldRenderer = CoreRegistry.get(WorldRenderer.class);
-        WorldProvider worldProvider = CoreRegistry.get(WorldProvider.class);
-
-        if (worldProvider != null && worldRenderer != null) {
-            Vector3f sunDirection = worldRenderer.getSkysphere().getSunDirection(false);
-
-            Vector3d zenithColor = ShaderParametersSky.getAllWeatherZenith(sunDirection.y, (Float) worldRenderer.getSkysphere().getTurbidity().getValue());
-            program.setFloat3("skyInscatteringColor", (float) zenithColor.x, (float) zenithColor.y, (float) zenithColor.z);
-
-            Vector4f skyInscatteringSettingsFrag = new Vector4f();
-            skyInscatteringSettingsFrag.x = (Float) worldRenderer.getSkysphere().getColorExp().getValue();
-            skyInscatteringSettingsFrag.y = (Float) skyInscatteringStrength.getValue();
-            skyInscatteringSettingsFrag.z = (Float) skyInscatteringLength.getValue();
-            skyInscatteringSettingsFrag.w = (Float) skyInscatteringThreshold.getValue();
-            program.setFloat4("skyInscatteringSettingsFrag", skyInscatteringSettingsFrag);
-        }
 
         Vector4f waterSettingsFrag = new Vector4f();
         waterSettingsFrag.x = (Float) waterNormalBias.getValue();
@@ -171,17 +146,12 @@ public class ShaderParametersChunk extends ShaderParametersBase {
 
     @Override
     public void addPropertiesToList(List<Property> properties) {
-        properties.add(skyInscatteringLength);
-        properties.add(skyInscatteringStrength);
-        properties.add(skyInscatteringThreshold);
         properties.add(waveIntens);
         properties.add(waveIntensFalloff);
         properties.add(waveSize);
         properties.add(waveSizeFalloff);
         properties.add(waveSpeed);
         properties.add(waveSpeedFalloff);
-        properties.add(torchSpecExp);
-        properties.add(torchWaterSpecExp);
         properties.add(waterSpecExp);
         properties.add(waterNormalBias);
         properties.add(waterFresnelBias);
