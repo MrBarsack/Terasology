@@ -3,15 +3,12 @@ package org.terasology.pathfinding.model;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.terasology.config.Config;
-import org.terasology.game.CoreRegistry;
 import org.terasology.math.Vector3i;
 import org.terasology.world.block.Block;
 import org.terasology.world.block.BlockUri;
 import org.terasology.world.block.family.SymmetricFamily;
 import org.terasology.world.block.management.BlockManager;
-import org.terasology.world.chunks.Chunk;
-import org.terasology.world.generator.core.PathfinderTestGenerator;
+import org.terasology.pathfinding.PathfinderTestGenerator;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -25,22 +22,22 @@ public class ConnectHeightMapTest {
     private TestHelper helper;
 
     public static String[] contourExpected = new String[]{
-            "C              C",
+            "       C        ",
             "                ",
             "                ",
             "                ",
             "                ",
             "                ",
             "                ",
+            "               C",
+            "C               ",
             "                ",
             "                ",
             "                ",
             "                ",
             "                ",
             "                ",
-            "                ",
-            "                ",
-            "C              C",
+            "        C       ",
     };
 
     @Test
@@ -119,7 +116,7 @@ public class ConnectHeightMapTest {
     private void assertCenter(HeightMap center, HeightMap left, HeightMap up, HeightMap right, HeightMap down) {
         assertCenter(center, left, up, right, down, null);
     }
-    private void assertCenter(HeightMap center, HeightMap left, HeightMap up, HeightMap right, HeightMap down, String[] contours) {
+    private void assertCenter(final HeightMap center, HeightMap left, HeightMap up, HeightMap right, HeightMap down, String[] contours) {
         final Floor centerFloor = center.getFloor(0);
         Floor upFloor = up.getFloor(0);
         Floor downFloor = down.getFloor(0);
@@ -131,9 +128,9 @@ public class ConnectHeightMapTest {
             String[] actual = helper.evaluate(new TestHelper.Runner() {
                 @Override
                 public char run(int x, int y, int z, char value) {
-                    return centerFloor.isContour(x, z) ? 'C' : ' ';
+                    return isEntrance(center.getCell(x,z).getBlock(y)) ? 'C' : ' ';
                 }
-            }, 0, 50, 0, 16, 1, 16);
+            }, 0, 51, 0, 16, 1, 16);
             Assert.assertArrayEquals(contours, actual);
         }
     }
@@ -146,5 +143,19 @@ public class ConnectHeightMapTest {
         }
         Assert.assertEquals(0, rest.size());
 
+    }
+
+    private boolean isEntrance(WalkableBlock block) {
+        if( block==null ) {
+            return false;
+        }
+        boolean isEntrance = false;
+        for (Entrance entrance : block.floor.entrances()) {
+            if( entrance.getAbstractBlock()==block ) {
+                isEntrance = true;
+                break;
+            }
+        }
+        return isEntrance;
     }
 }

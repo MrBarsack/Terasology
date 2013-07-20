@@ -35,8 +35,7 @@ import org.terasology.entitySystem.In;
 import org.terasology.entitySystem.RegisterComponentSystem;
 import org.terasology.logic.manager.ShaderManager;
 import org.terasology.rendering.assets.Texture;
-import org.terasology.rendering.cameras.Camera;
-import org.terasology.rendering.shader.ShaderProgram;
+import org.terasology.rendering.assets.GLSLShaderProgramInstance;
 import org.terasology.rendering.world.WorldRenderer;
 import org.terasology.utilities.FastRandom;
 import org.terasology.world.WorldProvider;
@@ -165,7 +164,7 @@ public class BlockParticleEmitterSystem implements UpdateSubscriberSystem, Rende
         particle.position.z += particle.velocity.z * delta;
     }
 
-    public void renderTransparent() {
+    public void renderAlphaBlend() {
         ShaderManager.getInstance().enableShader("particle");
         glDisable(GL11.GL_CULL_FACE);
 
@@ -195,8 +194,6 @@ public class BlockParticleEmitterSystem implements UpdateSubscriberSystem, Rende
             }
 
             if (particleEffect.blendMode == BlockParticleEffectComponent.ParticleBlendMode.ADD) {
-                glDepthMask(false);
-                glEnable(GL_BLEND);
                 glBlendFunc(GL_ONE, GL_ONE);
             }
 
@@ -207,8 +204,6 @@ public class BlockParticleEmitterSystem implements UpdateSubscriberSystem, Rende
             }
 
             if (particleEffect.blendMode == BlockParticleEffectComponent.ParticleBlendMode.ADD) {
-                glDepthMask(true);
-                glDisable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             }
         }
@@ -277,7 +272,7 @@ public class BlockParticleEmitterSystem implements UpdateSubscriberSystem, Rende
     }
 
     protected void renderParticle(Particle particle, float light) {
-        ShaderProgram shader = ShaderManager.getInstance().getShaderProgram("particle");
+        GLSLShaderProgramInstance shader = ShaderManager.getInstance().getShaderProgramInstance("particle");
 
         shader.setFloat4("colorOffset", particle.color.x, particle.color.y, particle.color.z, particle.color.w);
         shader.setFloat2("texOffset", particle.texOffset.x , particle.texOffset.y);
@@ -288,7 +283,7 @@ public class BlockParticleEmitterSystem implements UpdateSubscriberSystem, Rende
     }
 
     protected void renderParticle(Particle particle, short blockType, float temperature, float humidity, float light) {
-        ShaderProgram shader = ShaderManager.getInstance().getShaderProgram("particle");
+        GLSLShaderProgramInstance shader = ShaderManager.getInstance().getShaderProgramInstance("particle");
         Block b = BlockManager.getInstance().getBlock(blockType);
 
         Vector4f colorMod = b.calcColorOffsetFor(BlockPart.FRONT, temperature, humidity);

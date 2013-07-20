@@ -19,6 +19,7 @@ import org.lwjgl.opengl.GL13;
 import org.terasology.config.Config;
 import org.terasology.config.SystemConfig;
 import org.terasology.game.CoreRegistry;
+import org.terasology.rendering.assets.GLSLShaderProgramInstance;
 import org.terasology.rendering.cameras.Camera;
 import org.terasology.rendering.renderingProcesses.DefaultRenderingProcess;
 import org.terasology.rendering.world.WorldRenderer;
@@ -30,7 +31,7 @@ import org.terasology.rendering.world.WorldRenderer;
  */
 public class ShaderParametersDebug extends ShaderParametersBase {
 
-    public void applyParameters(ShaderProgram program) {
+    public void applyParameters(GLSLShaderProgramInstance program) {
         super.applyParameters(program);
 
         Config config = CoreRegistry.get(Config.class);
@@ -45,7 +46,8 @@ public class ShaderParametersDebug extends ShaderParametersBase {
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
             DefaultRenderingProcess.getInstance().bindFboTexture("sceneOpaque");
             program.setInt("texDebug", texId++);
-        } else if (config.getSystem().getDebugRenderingStage() == SystemConfig.DebugRenderingStages.DEBUG_STAGE_OPAQUE_NORMALS.ordinal()) {
+        } else if (config.getSystem().getDebugRenderingStage() == SystemConfig.DebugRenderingStages.DEBUG_STAGE_OPAQUE_NORMALS.ordinal()
+                || config.getSystem().getDebugRenderingStage() == SystemConfig.DebugRenderingStages.DEBUG_STAGE_OPAQUE_SUNLIGHT.ordinal()) {
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
             DefaultRenderingProcess.getInstance().bindFboNormalsTexture("sceneOpaque");
             program.setInt("texDebug", texId++);
@@ -63,11 +65,15 @@ public class ShaderParametersDebug extends ShaderParametersBase {
             program.setInt("texDebug", texId++);
         } else if (config.getSystem().getDebugRenderingStage() == SystemConfig.DebugRenderingStages.DEBUG_STAGE_SSAO.ordinal()) {
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
-            DefaultRenderingProcess.getInstance().bindFboTexture("ssaoBlurred1");
+            DefaultRenderingProcess.getInstance().bindFboTexture("ssaoBlurred");
             program.setInt("texDebug", texId++);
         } else if (config.getSystem().getDebugRenderingStage() == SystemConfig.DebugRenderingStages.DEBUG_STAGE_SOBEL.ordinal()) {
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
             DefaultRenderingProcess.getInstance().bindFboTexture("sobel");
+            program.setInt("texDebug", texId++);
+        } else if (config.getSystem().getDebugRenderingStage() == SystemConfig.DebugRenderingStages.DEBUG_STAGE_BAKED_OCCLUSION.ordinal()) {
+            GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
+            DefaultRenderingProcess.getInstance().bindFboTexture("sceneOpaque");
             program.setInt("texDebug", texId++);
         }  else if (config.getSystem().getDebugRenderingStage() == SystemConfig.DebugRenderingStages.DEBUG_STAGE_RECONSTRUCTED_POSITION.ordinal()) {
             Camera activeCamera = CoreRegistry.get(WorldRenderer.class).getActiveCamera();
@@ -80,7 +86,7 @@ public class ShaderParametersDebug extends ShaderParametersBase {
             program.setInt("texDebug", texId++);
         } else if (config.getSystem().getDebugRenderingStage() == SystemConfig.DebugRenderingStages.DEBUG_STAGE_BLOOM.ordinal()) {
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
-            DefaultRenderingProcess.getInstance().bindFboTexture("sceneBloom1");
+            DefaultRenderingProcess.getInstance().bindFboTexture("sceneBloom2");
             program.setInt("texDebug", texId++);
         } else if (config.getSystem().getDebugRenderingStage() == SystemConfig.DebugRenderingStages.DEBUG_STAGE_HIGH_PASS.ordinal()) {
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
@@ -89,6 +95,10 @@ public class ShaderParametersDebug extends ShaderParametersBase {
         } else if (config.getSystem().getDebugRenderingStage() == SystemConfig.DebugRenderingStages.DEBUG_STAGE_SKY_BAND.ordinal()) {
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
             DefaultRenderingProcess.getInstance().bindFboTexture("sceneSkyBand1");
+            program.setInt("texDebug", texId++);
+        } else if (config.getSystem().getDebugRenderingStage() == SystemConfig.DebugRenderingStages.DEBUG_STAGE_LIGHT_SHAFTS.ordinal()) {
+            GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
+            DefaultRenderingProcess.getInstance().bindFboTexture("lightShafts");
             program.setInt("texDebug", texId++);
         }
 

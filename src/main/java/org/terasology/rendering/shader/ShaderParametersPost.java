@@ -15,13 +15,13 @@
  */
 package org.terasology.rendering.shader;
 
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.*;
 import org.terasology.asset.Assets;
 import org.terasology.componentSystem.controllers.LocalPlayerSystem;
 import org.terasology.config.Config;
 import org.terasology.editor.properties.Property;
 import org.terasology.game.CoreRegistry;
+import org.terasology.rendering.assets.GLSLShaderProgramInstance;
 import org.terasology.rendering.renderingProcesses.DefaultRenderingProcess;
 import org.terasology.rendering.assets.Texture;
 import org.terasology.rendering.cameras.Camera;
@@ -43,16 +43,14 @@ public class ShaderParametersPost extends ShaderParametersBase {
 
     FastRandom rand = new FastRandom();
 
-    Texture vignetteTexture = Assets.getTexture("engine:vignette");
-
     Texture filmGrainNoiseTexture = Assets.getTexture("engine:noise");
     Property filmGrainIntensity = new Property("filmGrainIntensity", 0.025f, 0.0f, 1.0f);
 
-    Property blurStart = new Property("blurStart", 0.1f, 0.0f, 1.0f);
-    Property blurLength = new Property("blurLength", 0.1f, 0.0f, 1.0f);
+    Property blurStart = new Property("blurStart", 0.0f, 0.0f, 1.0f);
+    Property blurLength = new Property("blurLength", 0.15f, 0.0f, 1.0f);
 
     @Override
-    public void applyParameters(ShaderProgram program) {
+    public void applyParameters(GLSLShaderProgramInstance program) {
         super.applyParameters(program);
 
         WorldRenderer worldRenderer = CoreRegistry.get(WorldRenderer.class);
@@ -62,10 +60,6 @@ public class ShaderParametersPost extends ShaderParametersBase {
         GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
         DefaultRenderingProcess.getInstance().bindFboTexture("sceneToneMapped");
         program.setInt("texScene", texId++);
-
-        GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
-        DefaultRenderingProcess.getInstance().bindFboTexture("sceneBloom1");
-        program.setInt("texBloom", texId++);
 
         if (CoreRegistry.get(Config.class).getRendering().getBlurIntensity() != 0) {
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
@@ -80,16 +74,17 @@ public class ShaderParametersPost extends ShaderParametersBase {
             program.setFloat("blurLength", (Float) blurLength.getValue());
         }
 
-        GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
-        glBindTexture(GL11.GL_TEXTURE_2D, vignetteTexture.getId());
-        program.setInt("texVignette", texId++);
-        Vector3f tint = worldRenderer.getTint();
-        program.setFloat3("inLiquidTint", tint.x, tint.y, tint.z);
+        Texture colorGradingLut = Assets.getTexture("engine:colorGradingLut1");
+
+        if (colorGradingLut != null) {
+            GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
+            glBindTexture(GL12.GL_TEXTURE_3D, colorGradingLut.getId());
+            program.setInt("texColorGradingLut", texId++);
+        }
 
         DefaultRenderingProcess.FBO sceneCombined = DefaultRenderingProcess.getInstance().getFBO("sceneOpaque");
 
         if (sceneCombined != null) {
-
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
             sceneCombined.bindDepthTexture();
             program.setInt("texDepth", texId++);
