@@ -14,13 +14,13 @@ public class RenderingConfig {
     private int windowHeight = 720;
     private boolean fullscreen = false;
     private int activeViewDistanceMode = 0;
-    private boolean flickeringLight = false;
+    private boolean flickeringLight = true;
     private boolean animateGrass = false;
     private boolean animateWater = false;
     private float fieldOfView = 90;
     private boolean cameraBobbing = true;
     private boolean renderPlacingBox = true;
-    private int blurIntensity = 3;
+    private int blurIntensity = 2;
     private boolean reflectiveWater = false;
     private boolean vignette = true;
     private boolean motionBlur = false;
@@ -35,6 +35,11 @@ public class RenderingConfig {
     private int maxTextureAtlasResolution = 4096;
     private int maxChunksUsedForShadowMapping = 1024;
     private int shadowMapResolution = 1024;
+    private boolean normalMapping = false;
+    private boolean parallaxMapping = false;
+    private boolean dynamicShadowsPcfFiltering = false;
+    private boolean volumetricFog = false;
+    private boolean cloudShadows = false;
 
     public int getBlurRadius() {
         return Math.max(1, blurIntensity);
@@ -269,5 +274,45 @@ public class RenderingConfig {
 
     public void setShadowMapResolution(int shadowMapResolution) {
         this.shadowMapResolution = shadowMapResolution;
+    }
+
+    public boolean isNormalMapping() {
+        return normalMapping;
+    }
+
+    public void setNormalMapping(boolean normalMapping) {
+        this.normalMapping = normalMapping;
+    }
+
+    public boolean isParallaxMapping() {
+        return parallaxMapping;
+    }
+
+    public void setParallaxMapping(boolean parallaxMapping) {
+        this.parallaxMapping = parallaxMapping;
+    }
+
+    public boolean isDynamicShadowsPcfFiltering() {
+        return dynamicShadowsPcfFiltering;
+    }
+
+    public void setDynamicShadowsPcfFiltering(boolean dynamicShadowsPcfFiltering) {
+        this.dynamicShadowsPcfFiltering = dynamicShadowsPcfFiltering;
+    }
+
+    public boolean isVolumetricFog() {
+        return volumetricFog;
+    }
+
+    public void setVolumetricFog(boolean volumetricFog) {
+        this.volumetricFog = volumetricFog;
+    }
+
+    public boolean isCloudShadows() {
+        return cloudShadows;
+    }
+
+    public void setCloudShadows(boolean cloudShadows) {
+        this.cloudShadows = cloudShadows;
     }
 }

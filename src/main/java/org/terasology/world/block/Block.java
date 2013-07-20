@@ -33,7 +33,7 @@ import org.terasology.math.TeraMath;
 import org.terasology.math.Vector3i;
 import org.terasology.rendering.primitives.Mesh;
 import org.terasology.rendering.primitives.Tessellator;
-import org.terasology.rendering.shader.ShaderProgram;
+import org.terasology.rendering.assets.GLSLShaderProgramInstance;
 import org.terasology.utilities.collection.EnumBooleanMap;
 import org.terasology.world.block.family.BlockFamily;
 import org.terasology.world.block.management.BlockManager;
@@ -676,14 +676,17 @@ public class Block {
         return getBounds(new Vector3i(floatPos, 0.5f));
     }
 
-    public void renderWithLightValue(float light) {
+    public void renderWithLightValue(float sunlight, float blockLight) {
         if (isInvisible()) {
             return;
         }
 
-        ShaderProgram shader = ShaderManager.getInstance().getShaderProgram("block");
+        GLSLShaderProgramInstance shader = ShaderManager.getInstance().getShaderProgramInstance("block");
+        shader.addFeatureIfAvailable(GLSLShaderProgramInstance.ShaderProgramFeatures.FEATURE_USE_MATRIX_STACK);
+
         shader.enable();
-        shader.setFloat("light", light);
+        shader.setFloat("sunlight", sunlight);
+        shader.setFloat("blockLight", blockLight);
 
         if (mesh == null) {
             generateMesh();
@@ -699,6 +702,8 @@ public class Block {
             mesh.render();
             glEnable(GL11.GL_CULL_FACE);
         }
+
+        shader.removeFeature(GLSLShaderProgramInstance.ShaderProgramFeatures.FEATURE_USE_MATRIX_STACK);
     }
 
     private void generateMesh() {

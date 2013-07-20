@@ -25,13 +25,16 @@ uniform vec4 colorOffset = vec4(1.0, 1.0, 1.0, 1.0);
 varying vec3 normal;
 varying vec4 vertexViewPos;
 
-void main(){
+void main() {
     vec4 color = texture2D(textureAtlas, gl_TexCoord[0].xy * texScale.xy + texOffset.xy);
 
-    if (color.a < 0.01)
+#if defined (FEATURE_ALPHA_REJECT)
+    if (color.a < 0.1) {
         discard;
+    }
+#endif
 
-    // Particles are currently renderer using forward shading
+    // Particles are currently renderer using forward rendering
     color.rgb *= light;
 
     gl_FragData[0].a = color.a * colorOffset.a;

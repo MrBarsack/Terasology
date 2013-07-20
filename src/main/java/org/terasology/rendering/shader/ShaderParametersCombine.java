@@ -15,14 +15,23 @@
  */
 package org.terasology.rendering.shader;
 
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
+import org.terasology.asset.Assets;
 import org.terasology.config.Config;
 import org.terasology.editor.properties.Property;
 import org.terasology.game.CoreRegistry;
+import org.terasology.rendering.assets.GLSLShaderProgramInstance;
+import org.terasology.rendering.assets.Texture;
+import org.terasology.rendering.cameras.Camera;
 import org.terasology.rendering.renderingProcesses.DefaultRenderingProcess;
+import org.terasology.rendering.world.WorldRenderer;
 
+import javax.vecmath.Vector3f;
 import javax.vecmath.Vector4f;
 import java.util.List;
+
+import static org.lwjgl.opengl.GL11.glBindTexture;
 
 /**
  * Shader parameters for the Combine shader program.
@@ -31,15 +40,19 @@ import java.util.List;
  */
 public class ShaderParametersCombine extends ShaderParametersBase {
 
-    private Property outlineDepthThreshold = new Property("outlineDepthThreshold", 0.01f, 0.001f, 0.1f);
-    private Property outlineThickness = new Property("outlineThickness", 1.0f);
+    private Property outlineDepthThreshold = new Property("outlineDepthThreshold", 0.001f, 0.001f, 0.005f);
+    private Property outlineThickness = new Property("outlineThickness", 0.65f);
 
-    Property skyInscatteringLength = new Property("skyInscatteringLength", 0.2f, 0.0f, 1.0f);
-    Property skyInscatteringStrength = new Property("skyInscatteringStrength", 0.64f, 0.0f, 1.0f);
-    Property skyInscatteringThreshold = new Property("skyInscatteringThreshold", 1.0f, 0.0f, 1.0f);
+    Property skyInscatteringLength = new Property("skyInscatteringLength", 0.25f, 0.0f, 1.0f);
+    Property skyInscatteringStrength = new Property("skyInscatteringStrength", 0.35f, 0.0f, 1.0f);
+    Property skyInscatteringThreshold = new Property("skyInscatteringThreshold", 0.75f, 0.0f, 1.0f);
+
+    Property volFogDensityAtViewer = new Property("volFogDensityAtViewer", 0.15f, 0.001f, 1.0f);
+    Property volFogGlobalDensity = new Property("volFogGlobalDensity", 0.05f, 0.01f, 1.0f);
+    Property volFogHeightFalloff = new Property("volFogHeightFalloff", 0.1f, 0.01f, 1.0f);
 
     @Override
-    public void applyParameters(ShaderProgram program) {
+    public void applyParameters(GLSLShaderProgramInstance program) {
         super.applyParameters(program);
 
         int texId = 0;
@@ -64,6 +77,20 @@ public class ShaderParametersCombine extends ShaderParametersBase {
             program.setInt("texSceneOpaqueLightBuffer", texId++);
         }
 
+        if (CoreRegistry.get(Config.class).getRendering().isVolumetricFog()) {
+            Camera activeCamera = CoreRegistry.get(WorldRenderer.class).getActiveCamera();
+            if (activeCamera != null) {
+                program.setMatrix4("invViewProjMatrix", activeCamera.getInverseViewProjectionMatrix());
+
+                Vector3f fogWorldPosition = new Vector3f(activeCamera.getPosition().x, 32.0f, activeCamera.getPosition().y);
+                fogWorldPosition.sub(activeCamera.getPosition());
+                program.setFloat3("fogWorldPosition", fogWorldPosition.x, fogWorldPosition.y, fogWorldPosition.z);
+            }
+
+            program.setFloat4("volumetricFogSettings", (Float) volFogDensityAtViewer.getValue(),
+                    (Float) volFogGlobalDensity.getValue(), (Float) volFogHeightFalloff.getValue(), 0.0f);
+        }
+
         DefaultRenderingProcess.FBO sceneTransparent = DefaultRenderingProcess.getInstance().getFBO("sceneTransparent");
 
         if (sceneTransparent != null) {
@@ -74,7 +101,7 @@ public class ShaderParametersCombine extends ShaderParametersBase {
 
         if (CoreRegistry.get(Config.class).getRendering().isSsao()) {
             GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
-            DefaultRenderingProcess.getInstance().bindFboTexture("ssaoBlurred1");
+            DefaultRenderingProcess.getInstance().bindFboTexture("ssaoBlurred");
             program.setInt("texSsao", texId++);
         }
 
@@ -105,5 +132,8 @@ public class ShaderParametersCombine extends ShaderParametersBase {
         properties.add(skyInscatteringThreshold);
         properties.add(outlineThickness);
         properties.add(outlineDepthThreshold);
+        properties.add(volFogDensityAtViewer);
+        properties.add(volFogGlobalDensity);
+        properties.add(volFogHeightFalloff);
     }
 }

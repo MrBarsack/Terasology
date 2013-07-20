@@ -1,6 +1,9 @@
 package org.terasology.config;
 
 
+import org.terasology.game.types.GameTypeUri;
+import org.terasology.world.generator.MapGeneratorUri;
+
 /**
  * @author Immortius
  */
@@ -21,6 +24,9 @@ public class WorldGenerationConfig {
     private float  HillDensityFACTOR = 50.0f;
     private float  plateauAreaFACTOR = 50.0f;
     private float  caveDensityFACTOR = 50.0f;
+
+    private MapGeneratorUri defaultMapGenerator = new MapGeneratorUri("core:perlin");
+    private GameTypeUri defaultGameType = new GameTypeUri("core:survival");
 
     public String getWorldTitle() {
         return worldTitle;
@@ -140,4 +146,19 @@ public class WorldGenerationConfig {
         this.caveDensityFACTOR = caveDensityFACTOR;
     }
 
+    public MapGeneratorUri getDefaultMapGenerator() {
+        return defaultMapGenerator;
+    }
+
+    public void setDefaultMapGenerator(MapGeneratorUri defaultMapGenerator) {
+        this.defaultMapGenerator = defaultMapGenerator;
+    }
+
+    public GameTypeUri getDefaultGameType() {
+        return defaultGameType;
+    }
+
+    public void setDefaultGameType(GameTypeUri defaultGameType) {
+        this.defaultGameType = defaultGameType;
+    }
 }

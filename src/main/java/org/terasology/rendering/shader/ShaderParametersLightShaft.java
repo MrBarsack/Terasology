@@ -18,6 +18,7 @@ package org.terasology.rendering.shader;
 import org.lwjgl.opengl.GL13;
 import org.terasology.editor.properties.Property;
 import org.terasology.game.CoreRegistry;
+import org.terasology.rendering.assets.GLSLShaderProgramInstance;
 import org.terasology.rendering.renderingProcesses.DefaultRenderingProcess;
 import org.terasology.rendering.cameras.Camera;
 import org.terasology.rendering.world.WorldRenderer;
@@ -39,18 +40,20 @@ public class ShaderParametersLightShaft extends ShaderParametersBase {
     private Property decay = new Property("decay", 0.9f, 0.0f, 0.99f);
 
     @Override
-    public void applyParameters(ShaderProgram program) {
+    public void applyParameters(GLSLShaderProgramInstance program) {
         super.applyParameters(program);
 
         DefaultRenderingProcess.FBO scene = DefaultRenderingProcess.getInstance().getFBO("sceneOpaque");
 
+        int texId = 0;
+
         if (scene != null) {
-            GL13.glActiveTexture(GL13.GL_TEXTURE0);
+            GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
             scene.bindTexture();
-            program.setInt("texScene", 0);
-            GL13.glActiveTexture(GL13.GL_TEXTURE1);
-            scene.bindNormalsTexture();
-            program.setInt("texNormals", 0);
+            program.setInt("texScene", texId++);
+            GL13.glActiveTexture(GL13.GL_TEXTURE0 + texId);
+            scene.bindDepthTexture();
+            program.setInt("texDepth", texId++);
         }
 
         program.setFloat("density", (Float) density.getValue());

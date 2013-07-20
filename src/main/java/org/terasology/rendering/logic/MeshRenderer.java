@@ -15,30 +15,13 @@
  */
 package org.terasology.rendering.logic;
 
-import static org.lwjgl.opengl.GL11.GL_COLOR_ARRAY;
-import static org.lwjgl.opengl.GL11.GL_NORMAL_ARRAY;
-import static org.lwjgl.opengl.GL11.GL_TEXTURE_COORD_ARRAY;
-import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
-import static org.lwjgl.opengl.GL11.GL_VERTEX_ARRAY;
-import static org.lwjgl.opengl.GL11.glColorPointer;
-import static org.lwjgl.opengl.GL11.glDisableClientState;
-import static org.lwjgl.opengl.GL11.glEnableClientState;
-import static org.lwjgl.opengl.GL11.glMultMatrix;
-import static org.lwjgl.opengl.GL11.glNormalPointer;
 import static org.lwjgl.opengl.GL11.glPopMatrix;
 import static org.lwjgl.opengl.GL11.glPushMatrix;
 import static org.lwjgl.opengl.GL11.glRotatef;
 import static org.lwjgl.opengl.GL11.glScalef;
-import static org.lwjgl.opengl.GL11.glTexCoordPointer;
 import static org.lwjgl.opengl.GL11.glTranslated;
-import static org.lwjgl.opengl.GL11.glVertexPointer;
-import gnu.trove.list.TFloatList;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TFloatArrayList;
-import gnu.trove.list.array.TIntArrayList;
 
 import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
 import java.util.Set;
 
 import javax.vecmath.AxisAngle4f;
@@ -48,17 +31,11 @@ import javax.vecmath.Vector3f;
 import javax.vecmath.Vector4f;
 
 import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL12;
-import org.lwjgl.opengl.GL13;
-import org.lwjgl.opengl.GL15;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.terasology.componentSystem.RenderSystem;
 import org.terasology.components.utility.DroppedItemTypeComponent;
-import org.terasology.rendering.logic.MeshComponent;
 import org.terasology.components.world.LocationComponent;
-import org.terasology.entitySystem.EntityManager;
 import org.terasology.entitySystem.EntityRef;
 import org.terasology.entitySystem.EventHandlerSystem;
 import org.terasology.entitySystem.ReceiveEvent;
@@ -66,22 +43,18 @@ import org.terasology.entitySystem.RegisterComponentSystem;
 import org.terasology.entitySystem.event.AddComponentEvent;
 import org.terasology.entitySystem.event.RemovedComponentEvent;
 import org.terasology.game.CoreRegistry;
-import org.terasology.logic.LocalPlayer;
 import org.terasology.logic.manager.ShaderManager;
-import org.terasology.logic.manager.VertexBufferObjectManager;
 import org.terasology.math.AABB;
 import org.terasology.math.TeraMath;
-import org.terasology.monitoring.PerformanceMonitor;
+import org.terasology.rendering.assets.GLSLShaderProgramInstance;
 import org.terasology.rendering.assets.Material;
 import org.terasology.rendering.primitives.Mesh;
 import org.terasology.rendering.primitives.Tessellator;
 import org.terasology.rendering.primitives.TessellatorHelper;
-import org.terasology.rendering.shader.ShaderProgram;
 import org.terasology.rendering.world.WorldRenderer;
 
 import com.bulletphysics.linearmath.Transform;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 
@@ -98,11 +71,11 @@ public class MeshRenderer implements RenderSystem, EventHandlerSystem {
     private WorldRenderer worldRenderer;
 
     private Multimap<Material, EntityRef> opaqueMesh = ArrayListMultimap.create();
-    private Multimap<Material, EntityRef> translucentMesh = HashMultimap.create();
+    //private Multimap<Material, EntityRef> translucentMesh = HashMultimap.create();
     private Set<EntityRef> gelatinous = Sets.newHashSet();
 
-    private int batchVertexBuffer;
-    private int batchIndexBuffer;
+    //private int batchVertexBuffer;
+    //private int batchIndexBuffer;
 
     boolean batch = false;
 
@@ -117,8 +90,8 @@ public class MeshRenderer implements RenderSystem, EventHandlerSystem {
         TessellatorHelper.addBlockMesh(tessellator, new Vector4f(1.0f, 1.0f, 1.0f, 0.6f), 1.0f, 1.0f, 0.8f, 0f, 0f, 0f);
         gelatinousCubeMesh = tessellator.generateMesh();
 
-        batchVertexBuffer = VertexBufferObjectManager.getInstance().getVboId();
-        batchIndexBuffer = VertexBufferObjectManager.getInstance().getVboId();
+        //batchVertexBuffer = VertexBufferObjectManager.getInstance().getVboId();
+        //batchIndexBuffer = VertexBufferObjectManager.getInstance().getVboId();
     }
 
     @Override
@@ -159,10 +132,9 @@ public class MeshRenderer implements RenderSystem, EventHandlerSystem {
     }
 
     @Override
-    public void renderTransparent() {
-
+    public void renderAlphaBlend() {
         Vector3f cameraPosition = worldRenderer.getActiveCamera().getPosition();
-        ShaderProgram shader = ShaderManager.getInstance().getShaderProgram("gelatinousCube");
+        GLSLShaderProgramInstance shader = ShaderManager.getInstance().getShaderProgramInstance("gelatinousCube");
         shader.enable();
 
         for (EntityRef entity : gelatinous) {
@@ -198,34 +170,39 @@ public class MeshRenderer implements RenderSystem, EventHandlerSystem {
 
         Quat4f worldRot = new Quat4f();
         Vector3f worldPos = new Vector3f();
-        AxisAngle4f rot = new AxisAngle4f();
-        Matrix4f matrix = new Matrix4f();
-        Transform trans = new Transform();
-        Transform normTrans = new Transform();
+        //AxisAngle4f rot = new AxisAngle4f();
+        Matrix4f matrixWorldSpace = new Matrix4f();
+        Transform transWorldSpace = new Transform();
+        Matrix4f matrixCameraSpace = new Matrix4f();
+        //Transform normTrans = new Transform();
 
-        glPushMatrix();
-
-        glTranslated(-cameraPosition.x, -cameraPosition.y, -cameraPosition.z);
+        FloatBuffer tempMatrixBuffer44 = BufferUtils.createFloatBuffer(16);
+        FloatBuffer tempMatrixBuffer33 = BufferUtils.createFloatBuffer(12);
 
         for (Material material : opaqueMesh.keys()) {
             Mesh lastMesh = null;
             material.enable();
-            material.setFloat("light", 1);
 
+            material.getShaderProgramInstance().setBoolean("textured", true);
+
+            material.getShaderProgramInstance().setFloat("sunlight", 1.0f);
+            material.getShaderProgramInstance().setFloat("blockLight", 1.0f);
+
+            material.getShaderProgramInstance().setMatrix4("projectionMatrix", worldRenderer.getActiveCamera().getProjectionMatrix());
             material.bindTextures();
+
             lastRendered = opaqueMesh.get(material).size();
 
             // Batching
-            TFloatList vertexData = new TFloatArrayList();
+            /*TFloatList vertexData = new TFloatArrayList();
             TIntList indexData = new TIntArrayList();
             int indexOffset = 0;
             float[] openglMat = new float[16];
-            FloatBuffer mBuffer = BufferUtils.createFloatBuffer(16);
+            FloatBuffer mBuffer = BufferUtils.createFloatBuffer(16);*/
 
             for (EntityRef entity : opaqueMesh.get(material)) {
                 //Basic rendering
                 if (!batch) {
-
                     MeshComponent meshComp = entity.getComponent(MeshComponent.class);
                     LocationComponent location = entity.getComponent(LocationComponent.class);
 
@@ -239,10 +216,17 @@ public class MeshRenderer implements RenderSystem, EventHandlerSystem {
 
                     location.getWorldRotation(worldRot);
                     location.getWorldPosition(worldPos);
+
                     float worldScale = location.getWorldScale();
-                    matrix.set(worldRot, worldPos, worldScale);
-                    trans.set(matrix);
-                    AABB aabb = meshComp.mesh.getAABB().transform(trans);
+
+                    matrixWorldSpace.set(worldRot, worldPos, worldScale);
+                    transWorldSpace.set(matrixWorldSpace);
+
+                    Vector3f worldPositionCameraSpace = new Vector3f();
+                    worldPositionCameraSpace.sub(worldPos, cameraPosition);
+                    matrixCameraSpace.set(worldRot, worldPositionCameraSpace, worldScale);
+
+                    AABB aabb = meshComp.mesh.getAABB().transform(transWorldSpace);
 
                     boolean visible = worldRenderer.isAABBVisible(aabb);
                     if (visible) {
@@ -253,36 +237,40 @@ public class MeshRenderer implements RenderSystem, EventHandlerSystem {
                             lastMesh = meshComp.mesh;
                             meshComp.mesh.preRender();
                         }
-                        glPushMatrix();
-                        trans.getOpenGLMatrix(openglMat);
-                        mBuffer.put(openglMat);
-                        mBuffer.flip();
-                        glMultMatrix(mBuffer);
 
-                        material.setFloat("light", worldRenderer.getRenderingLightValueAt(worldPos));
+                        Matrix4f modelViewMatrix = TeraMath.calcModelViewMatrix(worldRenderer.getActiveCamera().getViewMatrix(), matrixCameraSpace);
+                        TeraMath.matrixToFloatBuffer(modelViewMatrix, tempMatrixBuffer44);
+
+                        material.getShaderProgramInstance().setMatrix4("worldViewMatrix", tempMatrixBuffer44);
+
+                        TeraMath.matrixToFloatBuffer(TeraMath.calcNormalMatrix(modelViewMatrix), tempMatrixBuffer33);
+                        material.getShaderProgramInstance().setMatrix3("normalMatrix", tempMatrixBuffer33);
+
+                        material.getShaderProgramInstance().setFloat("sunlight", worldRenderer.getSunlightValueAt(worldPos));
+                        material.getShaderProgramInstance().setFloat("blockLight", worldRenderer.getBlockLightValueAt(worldPos));
 
                         meshComp.mesh.doRender();
-
-                        glPopMatrix();
                     }
                 } else {
-                    // Batching
-                    MeshComponent meshComp = entity.getComponent(MeshComponent.class);
+                    // TODO: Do this
+                    throw new RuntimeException("Batching has to be overhauled to use shader parameters for matrices instead of the OGL matrix stack");
+
+                    /*MeshComponent meshComp = entity.getComponent(MeshComponent.class);
                     LocationComponent location = entity.getComponent(LocationComponent.class);
                     if (location == null) continue;
 
                     location.getWorldRotation(worldRot);
                     location.getWorldPosition(worldPos);
                     float worldScale = location.getWorldScale();
-                    matrix.set(worldRot, worldPos, worldScale);
-                    trans.set(matrix);
-                    matrix.set(worldRot, new Vector3f(), 1);
-                    normTrans.set(matrix);
-                    AABB aabb = meshComp.mesh.getAABB().transform(trans);
+                    matrixWorldSpace.set(worldRot, worldPos, worldScale);
+                    transWorldSpace.set(matrixWorldSpace);
+                    matrixWorldSpace.set(worldRot, new Vector3f(), 1);
+                    normTrans.set(matrixWorldSpace);
+                    AABB aabb = meshComp.mesh.getAABB().transform(transWorldSpace);
 
                     final boolean visible = worldRenderer.isAABBVisible(aabb);
                     if (visible) {
-                        indexOffset = meshComp.mesh.addToBatch(trans, normTrans, vertexData, indexData, indexOffset);
+                        indexOffset = meshComp.mesh.addToBatch(transWorldSpace, normTrans, vertexData, indexData, indexOffset);
                     }
 
                     if (indexOffset > 100)
@@ -290,19 +278,17 @@ public class MeshRenderer implements RenderSystem, EventHandlerSystem {
                         renderBatch(vertexData, indexData);
                         vertexData.clear();
                         indexData.clear();
-                    }
+                    }*/
                 }
             }
             if (lastMesh != null) {
                 lastMesh.postRender();
             }
 
-            if (batch) {
+            /*if (batch) {
                 renderBatch(vertexData, indexData);
-            }
+            }*/
         }
-
-        glPopMatrix();
     }
 
     @Override
@@ -310,52 +296,52 @@ public class MeshRenderer implements RenderSystem, EventHandlerSystem {
         render();
     }
 
-    private void renderBatch(TFloatList vertexData, TIntList indexData) {
-        if (vertexData.size() == 0 || indexData.size() == 0) return;
-
-        PerformanceMonitor.startActivity("BatchRenderMesh");
-        FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(vertexData.size());
-        vertexBuffer.put(vertexData.toArray());
-        vertexBuffer.flip();
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, batchVertexBuffer);
-        GL15.glBufferData(GL15.GL_ARRAY_BUFFER, vertexBuffer, GL15.GL_DYNAMIC_DRAW);
-
-        IntBuffer indexBuffer = BufferUtils.createIntBuffer(indexData.size());
-        indexBuffer.put(indexData.toArray());
-        indexBuffer.flip();
-        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, batchIndexBuffer);
-        GL15.glBufferData(GL15.GL_ELEMENT_ARRAY_BUFFER, indexBuffer, GL15.GL_DYNAMIC_DRAW);
-
-        glPushMatrix();
-
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-        glEnableClientState(GL_COLOR_ARRAY);
-        glEnableClientState(GL_NORMAL_ARRAY);
-
-        //GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, batchVertexBuffer);
-        //GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, batchIndexBuffer);
-
-        glVertexPointer(Mesh.VERTEX_SIZE, GL11.GL_FLOAT, 15 * 4, 0);
-        GL13.glClientActiveTexture(GL13.GL_TEXTURE0);
-        glTexCoordPointer(Mesh.TEX_COORD_0_SIZE, GL11.GL_FLOAT, 15 * 4, 4 * 3);
-        GL13.glClientActiveTexture(GL13.GL_TEXTURE1);
-        glTexCoordPointer(Mesh.TEX_COORD_1_SIZE, GL11.GL_FLOAT, 15 * 4, 4 * 5);
-        glColorPointer(Mesh.COLOR_SIZE, GL11.GL_FLOAT, 15 * 4, 4 * 11);
-        glNormalPointer(GL11.GL_FLOAT, 15 * 4, 4 * 8);
-
-        GL12.glDrawRangeElements(GL11.GL_TRIANGLES, 0, indexData.size(), indexData.size(), GL_UNSIGNED_INT, 0);
-
-        glDisableClientState(GL_NORMAL_ARRAY);
-        glDisableClientState(GL_COLOR_ARRAY);
-        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-        glDisableClientState(GL_VERTEX_ARRAY);
-
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
-        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
-        glPopMatrix();
-        PerformanceMonitor.endActivity();
-    }
+//    private void renderBatch(TFloatList vertexData, TIntList indexData) {
+//        if (vertexData.size() == 0 || indexData.size() == 0) return;
+//
+//        PerformanceMonitor.startActivity("BatchRenderMesh");
+//        FloatBuffer vertexBuffer = BufferUtils.createFloatBuffer(vertexData.size());
+//        vertexBuffer.put(vertexData.toArray());
+//        vertexBuffer.flip();
+//        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, batchVertexBuffer);
+//        GL15.glBufferData(GL15.GL_ARRAY_BUFFER, vertexBuffer, GL15.GL_DYNAMIC_DRAW);
+//
+//        IntBuffer indexBuffer = BufferUtils.createIntBuffer(indexData.size());
+//        indexBuffer.put(indexData.toArray());
+//        indexBuffer.flip();
+//        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, batchIndexBuffer);
+//        GL15.glBufferData(GL15.GL_ELEMENT_ARRAY_BUFFER, indexBuffer, GL15.GL_DYNAMIC_DRAW);
+//
+//        glPushMatrix();
+//
+//        glEnableClientState(GL_VERTEX_ARRAY);
+//        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+//        glEnableClientState(GL_COLOR_ARRAY);
+//        glEnableClientState(GL_NORMAL_ARRAY);
+//
+//        //GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, batchVertexBuffer);
+//        //GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, batchIndexBuffer);
+//
+//        glVertexPointer(Mesh.VERTEX_SIZE, GL11.GL_FLOAT, 15 * 4, 0);
+//        GL13.glClientActiveTexture(GL13.GL_TEXTURE0);
+//        glTexCoordPointer(Mesh.TEX_COORD_0_SIZE, GL11.GL_FLOAT, 15 * 4, 4 * 3);
+//        GL13.glClientActiveTexture(GL13.GL_TEXTURE1);
+//        glTexCoordPointer(Mesh.TEX_COORD_1_SIZE, GL11.GL_FLOAT, 15 * 4, 4 * 5);
+//        glColorPointer(Mesh.COLOR_SIZE, GL11.GL_FLOAT, 15 * 4, 4 * 11);
+//        glNormalPointer(GL11.GL_FLOAT, 15 * 4, 4 * 8);
+//
+//        GL12.glDrawRangeElements(GL11.GL_TRIANGLES, 0, indexData.size(), indexData.size(), GL_UNSIGNED_INT, 0);
+//
+//        glDisableClientState(GL_NORMAL_ARRAY);
+//        glDisableClientState(GL_COLOR_ARRAY);
+//        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+//        glDisableClientState(GL_VERTEX_ARRAY);
+//
+//        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+//        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
+//        glPopMatrix();
+//        PerformanceMonitor.endActivity();
+//    }
 
     @Override
     public void renderOverlay() {

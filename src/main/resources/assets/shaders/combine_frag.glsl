@@ -35,9 +35,24 @@ uniform sampler2D texEdges;
 
 uniform float outlineDepthThreshold;
 uniform float outlineThickness;
+
+# define OUTLINE_COLOR 0.0, 0.0, 0.0
 #endif
 
-#define OUTLINE_COLOR 0.0, 0.0, 0.0
+#if defined (VOLUMETRIC_FOG)
+uniform mat4 invViewProjMatrix;
+#endif
+
+#if defined (VOLUMETRIC_FOG)
+#define VOLUMETRIC_FOG_COLOR 1.0, 1.0, 1.0
+
+uniform vec4 volumetricFogSettings;
+#define volFogDensityAtViewer volumetricFogSettings.x
+#define volFogGlobalDensity volumetricFogSettings.y
+#define volFogHeightFalloff volumetricFogSettings.z
+
+uniform vec3 fogWorldPosition;
+#endif
 
 void main() {
     vec4 colorOpaque = texture2D(texSceneOpaque, gl_TexCoord[0].xy);
@@ -46,28 +61,43 @@ void main() {
     vec4 colorTransparent = texture2D(texSceneTransparent, gl_TexCoord[0].xy);
     vec4 lightBufferOpaque = texture2D(texSceneOpaqueLightBuffer, gl_TexCoord[0].xy);
 
-    // TODO: Move SSAO and outline stuff to LightBufferPass so it is available for refraction
+#if defined (VOLUMETRIC_FOG)
+    // TODO: As costly as in the deferred light geometry pass - frustum ray method would be great here
+    vec3 worldPosition = reconstructViewPos(depthOpaque, gl_TexCoord[0].xy, invViewProjMatrix);
+#endif
+
+#ifdef SSAO
+    float ssao = texture2D(texSsao, gl_TexCoord[0].xy).x;
+    colorOpaque.rgb *= ssao;
+#endif
+
+#ifdef OUTLINE
+    vec3 screenSpaceNormal = normalsOpaque.xyz * 2.0 - 1.0;
+    float outlineFadeFactor = (1.0 - abs(screenSpaceNormal.y)); // Use the normal to avoid artifacts on flat wide surfaces
+
+    float outline = step(outlineDepthThreshold, texture2D(texEdges, gl_TexCoord[0].xy).x) * outlineThickness * outlineFadeFactor;
+    colorOpaque.rgb = mix(colorOpaque.rgb, vec3(OUTLINE_COLOR), outline);
+#endif
 
     // Sky inscattering using down-sampled sky band texture
     vec3 skyInscatteringColor = texture2D(texSceneSkyBand, gl_TexCoord[0].xy).rgb;
 
-    float d = abs(linDepthVDist(depthOpaque));
+    float d = abs(linDepthViewingDistance(depthOpaque));
     float fogValue = clamp(((skyInscatteringLength - d) / (skyInscatteringLength - skyInscatteringThreshold)) * skyInscatteringStrength, 0.0, 1.0);
 
-    // No scattering in the sky please - otherwise we end up with an ugly blurred sky
-    if (depthOpaque < 1.0) {
-        colorOpaque = mix(colorOpaque, vec4(skyInscatteringColor, 1.0), fogValue);
-        colorTransparent = mix(colorTransparent, vec4(skyInscatteringColor, 1.0), fogValue);
+    // No scattering in the sky please - otherwise we end up with an ugly blurry sky
+    if (!epsilonEqualsOne(depthOpaque)) {
+        colorOpaque.rgb = mix(colorOpaque.rgb, skyInscatteringColor, fogValue);
+        colorTransparent.rgb = mix(colorTransparent.rgb, skyInscatteringColor, fogValue);
     }
 
-#ifdef SSAO
-    float ssao = texture2D(texSsao, gl_TexCoord[0].xy).x;
-    colorOpaque.rgb *= mix(vec3(ssao), vec3(1.0, 1.0, 1.0), fogValue);
-#endif
+#if defined (VOLUMETRIC_FOG)
+    // Use lightValueAtPlayerPos to avoid volumetric fog in caves
+    float volumetricFogValue = sunlightValueAtPlayerPos * calcVolumetricFog(worldPosition - fogWorldPosition, volFogDensityAtViewer, volFogGlobalDensity, volFogHeightFalloff);
 
-#ifdef OUTLINE
-    float outline = step(outlineDepthThreshold, texture2D(texEdges, gl_TexCoord[0].xy).x) * outlineThickness * (1.0 - fogValue);
-    colorOpaque.rgb = (1.0 - outline) * colorOpaque.rgb + outline * vec3(OUTLINE_COLOR);
+    vec3 volFogColor = skyInscatteringColor * vec3(VOLUMETRIC_FOG_COLOR);
+    colorOpaque.rgb = mix(colorOpaque.rgb, volFogColor, volumetricFogValue);
+    colorTransparent.rgb = mix(colorTransparent.rgb, volFogColor, volumetricFogValue);
 #endif
 
     float fade = clamp(1.0 - colorTransparent.a, 0.0, 1.0);
@@ -76,5 +106,5 @@ void main() {
     gl_FragData[0].rgba = color.rgba;
     gl_FragData[1].rgba = normalsOpaque.rgba;
     gl_FragData[2].rgba = lightBufferOpaque.rgba;
-    gl_FragDepth = depthOpaque;
+    gl_FragDepth = depthOpaque * 0.5 + 0.5;
 }

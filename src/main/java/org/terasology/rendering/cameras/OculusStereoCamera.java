@@ -38,6 +38,12 @@ public class OculusStereoCamera extends Camera {
     protected Matrix4f projectionMatrixLeftEye = new Matrix4f();
     protected Matrix4f projectionMatrixRightEye = new Matrix4f();
 
+    protected Matrix4f inverseProjectionMatrixLeftEye = new Matrix4f();
+    protected Matrix4f inverseProjectionMatrixRightEye = new Matrix4f();
+
+    protected Matrix4f inverseViewProjectionMatrixLeftEye = new Matrix4f();
+    protected Matrix4f inverseViewProjectionMatrixRightEye = new Matrix4f();
+
     protected Matrix4f viewMatrixLeftEye = new Matrix4f();
     protected Matrix4f viewMatrixRightEye = new Matrix4f();
 
@@ -106,12 +112,12 @@ public class OculusStereoCamera extends Camera {
         WorldRenderer.WorldRenderingStage renderingStage = CoreRegistry.get(WorldRenderer.class).getCurrentRenderStage();
 
         if (renderingStage == WorldRenderer.WorldRenderingStage.OCULUS_LEFT_EYE) {
-            if (!reflected) {
+            if (!isReflected()) {
                 return viewMatrixLeftEye;
             }
             return viewMatrixReflectedLeftEye;
         } else if (renderingStage == WorldRenderer.WorldRenderingStage.OCULUS_RIGHT_EYE) {
-            if (!reflected) {
+            if (!isReflected()) {
                 return viewMatrixRightEye;
             }
             return viewMatrixReflectedRightEye;
@@ -127,6 +133,30 @@ public class OculusStereoCamera extends Camera {
             return projectionMatrixLeftEye;
         } else if (renderingStage == WorldRenderer.WorldRenderingStage.OCULUS_RIGHT_EYE) {
             return projectionMatrixRightEye;
+        }
+
+        return null;
+    }
+
+    public Matrix4f getInverseProjectionMatrix() {
+        WorldRenderer.WorldRenderingStage renderingStage = CoreRegistry.get(WorldRenderer.class).getCurrentRenderStage();
+
+        if (renderingStage == WorldRenderer.WorldRenderingStage.OCULUS_LEFT_EYE) {
+            return inverseProjectionMatrixLeftEye;
+        } else if (renderingStage == WorldRenderer.WorldRenderingStage.OCULUS_RIGHT_EYE) {
+            return inverseProjectionMatrixRightEye;
+        }
+
+        return null;
+    }
+
+    public Matrix4f getInverseViewProjectionMatrix() {
+        WorldRenderer.WorldRenderingStage renderingStage = CoreRegistry.get(WorldRenderer.class).getCurrentRenderStage();
+
+        if (renderingStage == WorldRenderer.WorldRenderingStage.OCULUS_LEFT_EYE) {
+            return inverseViewProjectionMatrixLeftEye;
+        } else if (renderingStage == WorldRenderer.WorldRenderingStage.OCULUS_RIGHT_EYE) {
+            return inverseViewProjectionMatrixRightEye;
         }
 
         return null;
@@ -164,11 +194,12 @@ public class OculusStereoCamera extends Camera {
         prevViewProjectionMatrix.set(viewProjectionMatrix);
 
         // Nothing to do...
-        if (cachedPosition.equals(getPosition()) && cachedViewigDirection.equals(getViewingDirection())) {
+        if (cachedPosition.equals(getPosition()) && cachedViewigDirection.equals(getViewingDirection())
+                && cachedZFar == zFar && cachedZNear == zNear) {
             return;
         }
 
-        projectionMatrix = TeraMath.createPerspectiveProjectionMatrix(OculusVrHelper.getyFov(), OculusVrHelper.getAspectRatio(), 0.1f, 5000.0f);
+        projectionMatrix = TeraMath.createPerspectiveProjectionMatrix(OculusVrHelper.getyFov(), OculusVrHelper.getAspectRatio(), zNear, zFar);
 
         projTranslationLeftEye.setIdentity();
         projTranslationLeftEye.setTranslation(new Vector3f(OculusVrHelper.getProjectionCenterOffset(), 0.0f, 0.0f));
@@ -208,12 +239,17 @@ public class OculusStereoCamera extends Camera {
         viewProjectionMatrixLeftEye = TeraMath.calcViewProjectionMatrix(viewMatrixLeftEye, projectionMatrixLeftEye);
         viewProjectionMatrixRightEye = TeraMath.calcViewProjectionMatrix(viewMatrixRightEye, projectionMatrixRightEye);
 
-        viewProjectionMatrix = TeraMath.calcViewProjectionMatrix(viewMatrix, projectionMatrix);
-        inverseViewProjectionMatrix.invert(viewProjectionMatrix);
+        inverseViewProjectionMatrixLeftEye.invert(viewProjectionMatrixLeftEye);
+        inverseViewProjectionMatrixRightEye.invert(viewProjectionMatrixRightEye);
+
+        inverseProjectionMatrixLeftEye.invert(projectionMatrixLeftEye);
+        inverseProjectionMatrixRightEye.invert(projectionMatrixRightEye);
 
         // Used for dirty checks
         cachedPosition.set(getPosition());
         cachedViewigDirection.set(getViewingDirection());
+        cachedZFar = zFar;
+        cachedZNear = zNear;
 
         updateFrustum();
     }
